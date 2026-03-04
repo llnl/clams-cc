@@ -1,0 +1,5 @@
+add_basic_executable(clustering_metrics)
+setup_ygm_target(clustering_metrics)
+
+add_basic_executable(clustering_metrics_no_mi)
+setup_ygm_target(clustering_metrics_no_mi)

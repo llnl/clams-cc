@@ -1,0 +1,38 @@
+Using signed cluster id type. Points are considered noise if cluster_id < 0
+is_cluster_noise(-1) = 1
+
+Calculating clustering metrics
+The number of ranks is 1
+
+Reading provided clustering 1 file/directory: "../example/example_clusters1.txt"
+Time to read first clustering file: 0.000762224 seconds
+
+Number of points with valid cluster ids in clustering 1: 50
+Number of clusters in clustering 1: 5
+
+-------------------------------------------------------
+
+Reading provided clustering 2 file/directory: "../example/example_clusters2.txt"
+Time to read comparison clustering file: 0.000734329 seconds
+
+Number of points with valid cluster ids in clustering 2 that are also in clustering 1: 45
+Number of noise points in clustering 2 (that are also points in clustering 1): 5
+Clustering 2 - Clustered %: 90
+
+Number of overlapping cluster pairs: 13
+Number of clusters in clustering 1: 5
+Number of clusters in clustering 2: 5
+Number of distinct cluster size pairs: 17
+Expected mutual information: 0.218812
+
+(Arithmetic-normalized) Adjusted Mutual Information (AMI): 0.502277
+
+Adjusted Rand Index (ARI): 0.435897
+Fowlkes Mallows Index: 0.546508
+(Assumes clustering 1 is the ground truth) Purity: 0.755556
+
+Pair-confusion Balanced Accuracy: 0.714646
+Pair-confusion Geometric Mean: 0.69179
+
+Time to calculate clustering metrics: 2.47955e-05 seconds
+Total time to calculate metrics for this clustering: 0.00106335 seconds

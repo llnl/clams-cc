@@ -1,0 +1,5 @@
+add_basic_executable(cluster_incidence)
+setup_ygm_target(cluster_incidence)
+
+add_basic_executable(graph_cluster_analysis)
+setup_ygm_target(graph_cluster_analysis)
