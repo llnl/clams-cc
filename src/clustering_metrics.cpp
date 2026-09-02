@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
         parse_clustering_metrics_options(argc, argv, opt, world);
     if (unsuccessful_parse) {
       show_help();
-      return 1;
+      return EXIT_FAILURE;
     }
 
     /*
@@ -129,6 +129,11 @@ int main(int argc, char **argv) {
     world.cout0("Number of clusters in clustering 1: ",
                 cluster_size_map1.size());
     step_timer.reset();
+
+    if (cluster_size_map1.size() == 0) {
+      world.cout0("No valid points read in partition 1. Exiting.");
+      return EXIT_FAILURE;
+    }
 
     // // Later, we'll pool all the map entries on this rank together so each
     // // rank gets a full copy of the local map
@@ -192,237 +197,244 @@ int main(int argc, char **argv) {
       world.barrier();
       step_timer.reset();
 
-      /* Create a YGM map of hash(i,j) -> tuple(overlap size, size of cluster
-      i, size of cluster j), where i is a cluster_id in the first clustering,
-      j is a cluster_id in the second clustering, and overlap size is the size
-      of the intersection between clusters i and j
-      */
-      ygm::container::map<std::pair<cluster_id_type, cluster_id_type>,
-                          std::tuple<uint64_t, uint64_t, uint64_t>>
-          cluster_overlap_map(world);
+      if (num_points == 0) {
+        world.cout0("Clusterings 1 and 2 do not share any valid points. "
+                    "Skipping this cluster comparison.");
+      } else {
 
-      // Process point_to_clusters_map to fill cluster_overlap_map,
-      // cluster_size_map1, and cluster_size_map2
-      fill_cluster_overlap_and_size_maps_mi(
-          point_to_clusters_map, cluster_overlap_map, cluster_size_map1,
-          cluster_size_map2);
+        /* Create a YGM map of hash(i,j) -> tuple(overlap size, size of cluster
+        i, size of cluster j), where i is a cluster_id in the first clustering,
+        j is a cluster_id in the second clustering, and overlap size is the size
+        of the intersection between clusters i and j
+        */
+        ygm::container::map<std::pair<cluster_id_type, cluster_id_type>,
+                            std::tuple<uint64_t, uint64_t, uint64_t>>
+            cluster_overlap_map(world);
 
-      world.cout0("\nNumber of overlapping cluster pairs: ",
-                  cluster_overlap_map.size());
-      world.cout0("Number of clusters in clustering 1: ",
-                  cluster_size_map1.size());
-      world.cout0("Number of clusters in clustering 2: ",
-                  cluster_size_map2.size());
-      if (opt.verbose) {
-        world.cout0(
-            "Time to create YGM maps of cluster overlaps and cluster sizes: ",
-            step_timer.elapsed(), " seconds");
-      }
+        // Process point_to_clusters_map to fill cluster_overlap_map,
+        // cluster_size_map1, and cluster_size_map2
+        fill_cluster_overlap_and_size_maps_mi(
+            point_to_clusters_map, cluster_overlap_map, cluster_size_map1,
+            cluster_size_map2);
 
-      step_timer.reset();
-      world.barrier();
-
-      /* Calculate the entropies required to calculate mutual information */
-
-      // Calculate the entropy for clustering 1
-      double entropy1 =
-          calculate_clustering_entropy(cluster_size_map1, num_points);
-
-      // Calculate the entropy of clustering 2
-      double entropy2 =
-          calculate_clustering_entropy(cluster_size_map2, num_points);
-
-      // Calculate the joint entropy
-      double joint_entropy =
-          calculate_joint_entropy(cluster_overlap_map, num_points);
-
-      if (opt.verbose) {
-        world.cout0("\nEntropy for clustering 1: ", entropy1);
-        world.cout0("Entropy for clustering 2: ", entropy2);
-        world.cout0("Joint entropy: ", joint_entropy);
-      }
-
-      /* Calculate the sums of sizes squared required for various clustering
-       * metrics */
-
-      uint64_t sum_squares_cluster1, sum_squares_cluster2, sum_squares_overlap;
-      sum_squares_cluster1 =
-          calculate_sums_of_squares_for_map_values(cluster_size_map1);
-      sum_squares_cluster2 =
-          calculate_sums_of_squares_for_map_values(cluster_size_map2);
-
-      // Calculate the sums of overlap sizes squared
-      sum_squares_overlap =
-          calculate_sum_squares_overlap_mi(cluster_overlap_map);
-
-      if (opt.verbose) {
-        world.cout0("Sum of cluster sizes squared for clustering 1: ",
-                    sum_squares_cluster1);
-        world.cout0("Sum of cluster sizes squared for clustering 2: ",
-                    sum_squares_cluster2);
-        world.cout0("Sum of overlaps squared for the two clusterings: ",
-                    sum_squares_overlap);
-        world.cout0("Time to calculate entropies and sums of sizes squared: ",
-                    step_timer.elapsed(), " seconds\n");
-      }
-
-      step_timer.reset();
-      world.barrier();
-
-      /*
-      Get cluster size counts for calculations for the expected value of
-      mutual information
-      */
-
-      cluster_size_count_map1.clear();
-      cluster_size_count_map2.clear();
-      world.barrier();
-
-      // For both clusterings 1 and 2, get map of cluster size -> number of
-      // clusters in clustering with that size
-      fill_cluster_size_count_map(cluster_size_map1, cluster_size_count_map1);
-      fill_cluster_size_count_map(cluster_size_map2, cluster_size_count_map2);
-
-      if (opt.verbose) {
-        world.cout0("Number of distinct cluster sizes for clustering 1: ",
-                    cluster_size_count_map1.size());
-        world.cout0("Number of distinct cluster sizes for clustering 2: ",
-                    cluster_size_count_map2.size());
-      }
-
-      // Clear cluster size maps since we're done with them
-      cluster_size_map1.clear();
-      cluster_size_map2.clear();
-      world.barrier();
-
-      /* Calculate purity */
-      double purity = 0.0;
-      if (opt.calculate_purity) {
-        purity = calculate_purity(cluster_overlap_map, num_points);
-      }
-
-      /*
-      Create a YGM map of pair(size1,size2) -> pair(number of instances,
-      adjustment_contribution), where (size1, size2) are the sizes for pairs
-      of clusters in different clusterings and we always pick size1 <= size2,
-      number of instances is how many distinct pairs of clusters in different
-      clusterings have sizes (size1, size2), and adjustment_contribution is the
-      contribution to the innermost sum in the expected value of mutual
-      information
-      */
-      ygm::container::map<std::pair<uint64_t, uint64_t>,
-                          std::pair<uint64_t, double>>
-          size_pair_map(world);
-
-      // Get the size pairs and how often they occur
-      get_size_pairs_and_counts_for_size_pair_map(
-          size_pair_map, cluster_size_count_map1, cluster_size_count_map2);
-
-      world.cout0("Number of distinct cluster size "
-                  "pairs: ",
-                  size_pair_map.size());
-      if (opt.verbose) {
-        world.cout0("Time to get the distinct cluster size pairs: ",
-                    step_timer.elapsed(), " seconds");
-      }
-      step_timer.reset();
-      world.barrier();
-
-      // Clear some space by freeing up size count maps
-      cluster_size_count_map1.clear();
-      cluster_size_count_map2.clear();
-
-      // Get the expected mutual information adjustment contribution for each
-      // size pair
-      fill_size_pair_map_expected_mi_contributions(size_pair_map, num_points);
-
-      // Calculate the expected mutual information
-      double expected_mutual_info =
-          calculate_expected_mutual_information(size_pair_map);
-      world.cout0("Expected mutual information: ", expected_mutual_info);
-      if (opt.verbose) {
-        world.cout0("Time to calculate expected mutual information: ",
-                    step_timer.elapsed(), " seconds");
-      }
-      step_timer.reset();
-      world.barrier();
-
-      /* Calculate various clustering metrics */
-      if (world.rank() == 0) {
-        // Calculate normalized mutual information
-        double mutual_info = entropy1 + entropy2 - joint_entropy;
-        double geometric_normalizer = std::sqrt(entropy1 * entropy2);
-        double arithmetic_normalizer = 0.5 * (entropy1 + entropy2);
-
+        world.cout0("\nNumber of overlapping cluster pairs: ",
+                    cluster_overlap_map.size());
+        world.cout0("Number of clusters in clustering 1: ",
+                    cluster_size_map1.size());
+        world.cout0("Number of clusters in clustering 2: ",
+                    cluster_size_map2.size());
         if (opt.verbose) {
-          std::cout << "\nUnnormalized mutual information I(X,Y) = "
-                    << mutual_info << std::endl;
-          std::cout << "Geometric normalized mutual information "
-                    << "I(X,Y) / sqrt(H(X)H(Y)) = "
-                    << mutual_info / geometric_normalizer << std::endl;
-          std::cout << "Arithmetic normalized mutual information "
-                    << "I(X,Y) / 0.5(H(X) + H(Y)) = "
-                    << mutual_info / arithmetic_normalizer << std::endl;
+          world.cout0(
+              "Time to create YGM maps of cluster overlaps and cluster sizes: ",
+              step_timer.elapsed(), " seconds");
         }
 
-        // Calculate adjusted mutual information
-        double arithmetic_adjusted_mutual_info =
-            (mutual_info - expected_mutual_info) /
-            (arithmetic_normalizer - expected_mutual_info);
-        double geometric_adjusted_mutual_info =
-            (mutual_info - expected_mutual_info) /
-            (geometric_normalizer - expected_mutual_info);
-        std::cout
-            << "\n(Arithmetic-normalized) Adjusted Mutual Information (AMI): "
-            //   << "{I(X,Y) - E[I(X,Y)]} / {0.5(H(X) + H(Y)) - E[I(X,Y)]} = "
-            << arithmetic_adjusted_mutual_info << std::endl;
+        step_timer.reset();
+        world.barrier();
+
+        /* Calculate the entropies required to calculate mutual information */
+
+        // Calculate the entropy for clustering 1
+        double entropy1 =
+            calculate_clustering_entropy(cluster_size_map1, num_points);
+
+        // Calculate the entropy of clustering 2
+        double entropy2 =
+            calculate_clustering_entropy(cluster_size_map2, num_points);
+
+        // Calculate the joint entropy
+        double joint_entropy =
+            calculate_joint_entropy(cluster_overlap_map, num_points);
+
         if (opt.verbose) {
-          std::cout
-              << "Geometric-normalized adjusted mutual information: "
-              //   << "{I(X,Y) - E[I(X,Y)]} / {sqrt(H(X)H(Y)) - E[I(X,Y)]} = "
-              << geometric_adjusted_mutual_info << std::endl;
+          world.cout0("\nEntropy for clustering 1: ", entropy1);
+          world.cout0("Entropy for clustering 2: ", entropy2);
+          world.cout0("Joint entropy: ", joint_entropy);
         }
 
-        // Calculate clustering metrics that only need sums of squares
-        clustering_metrics_no_mi_type clustering_metrics_no_mi;
-        clustering_metrics_no_mi = calculate_clustering_metrics_no_mi(
-            num_points, sum_squares_overlap, sum_squares_cluster1,
-            sum_squares_cluster2);
+        /* Calculate the sums of sizes squared required for various clustering
+         * metrics */
 
-        std::cout << "\nAdjusted Rand Index (ARI): "
-                  << clustering_metrics_no_mi.adjusted_rand_index << std::endl;
-        std::cout << "Fowlkes Mallows Index: "
-                  << clustering_metrics_no_mi.fowlkes_mallows << std::endl;
+        uint64_t sum_squares_cluster1, sum_squares_cluster2,
+            sum_squares_overlap;
+        sum_squares_cluster1 =
+            calculate_sums_of_squares_for_map_values(cluster_size_map1);
+        sum_squares_cluster2 =
+            calculate_sums_of_squares_for_map_values(cluster_size_map2);
+
+        // Calculate the sums of overlap sizes squared
+        sum_squares_overlap =
+            calculate_sum_squares_overlap_mi(cluster_overlap_map);
+
+        if (opt.verbose) {
+          world.cout0("Sum of cluster sizes squared for clustering 1: ",
+                      sum_squares_cluster1);
+          world.cout0("Sum of cluster sizes squared for clustering 2: ",
+                      sum_squares_cluster2);
+          world.cout0("Sum of overlaps squared for the two clusterings: ",
+                      sum_squares_overlap);
+          world.cout0("Time to calculate entropies and sums of sizes squared: ",
+                      step_timer.elapsed(), " seconds\n");
+        }
+
+        step_timer.reset();
+        world.barrier();
+
+        /*
+        Get cluster size counts for calculations for the expected value of
+        mutual information
+        */
+
+        cluster_size_count_map1.clear();
+        cluster_size_count_map2.clear();
+        world.barrier();
+
+        // For both clusterings 1 and 2, get map of cluster size -> number of
+        // clusters in clustering with that size
+        fill_cluster_size_count_map(cluster_size_map1, cluster_size_count_map1);
+        fill_cluster_size_count_map(cluster_size_map2, cluster_size_count_map2);
+
+        if (opt.verbose) {
+          world.cout0("Number of distinct cluster sizes for clustering 1: ",
+                      cluster_size_count_map1.size());
+          world.cout0("Number of distinct cluster sizes for clustering 2: ",
+                      cluster_size_count_map2.size());
+        }
+
+        // Clear cluster size maps since we're done with them
+        cluster_size_map1.clear();
+        cluster_size_map2.clear();
+        world.barrier();
+
+        /* Calculate purity */
+        double purity = 0.0;
         if (opt.calculate_purity) {
-          std::cout << "(Assumes clustering 1 is the ground truth) Purity: "
-                    << purity << std::endl;
+          purity = calculate_purity(cluster_overlap_map, num_points);
         }
-        std::cout << "\nPair-confusion Balanced Accuracy: "
-                  << clustering_metrics_no_mi.balanced_accuracy << std::endl;
-        std::cout << "Pair-confusion Geometric Mean: "
-                  << clustering_metrics_no_mi.geometric_mean << std::endl;
 
+        /*
+        Create a YGM map of pair(size1,size2) -> pair(number of instances,
+        adjustment_contribution), where (size1, size2) are the sizes for pairs
+        of clusters in different clusterings and we always pick size1 <= size2,
+        number of instances is how many distinct pairs of clusters in different
+        clusterings have sizes (size1, size2), and adjustment_contribution is
+        the contribution to the innermost sum in the expected value of mutual
+        information
+        */
+        ygm::container::map<std::pair<uint64_t, uint64_t>,
+                            std::pair<uint64_t, double>>
+            size_pair_map(world);
+
+        // Get the size pairs and how often they occur
+        get_size_pairs_and_counts_for_size_pair_map(
+            size_pair_map, cluster_size_count_map1, cluster_size_count_map2);
+
+        world.cout0("Number of distinct cluster size "
+                    "pairs: ",
+                    size_pair_map.size());
         if (opt.verbose) {
-          // Calculate Rand Index (without adjustment)
-          double numerator = static_cast<double>(
-              num_points * (num_points - 1) + 2 * sum_squares_overlap -
-              sum_squares_cluster1 - sum_squares_cluster2);
-          double denominator =
-              static_cast<double>(num_points * (num_points - 1));
-
-          double rand_index = numerator / denominator;
-
-          std::cout << "\nUnadjusted Rand Index: " << rand_index << std::endl;
+          world.cout0("Time to get the distinct cluster size pairs: ",
+                      step_timer.elapsed(), " seconds");
         }
+        step_timer.reset();
+        world.barrier();
+
+        // Clear some space by freeing up size count maps
+        cluster_size_count_map1.clear();
+        cluster_size_count_map2.clear();
+
+        // Get the expected mutual information adjustment contribution for each
+        // size pair
+        fill_size_pair_map_expected_mi_contributions(size_pair_map, num_points);
+
+        // Calculate the expected mutual information
+        double expected_mutual_info =
+            calculate_expected_mutual_information(size_pair_map);
+        world.cout0("Expected mutual information: ", expected_mutual_info);
+        if (opt.verbose) {
+          world.cout0("Time to calculate expected mutual information: ",
+                      step_timer.elapsed(), " seconds");
+        }
+        step_timer.reset();
+        world.barrier();
+
+        /* Calculate various clustering metrics */
+        if (world.rank() == 0) {
+          // Calculate normalized mutual information
+          double mutual_info = entropy1 + entropy2 - joint_entropy;
+          double geometric_normalizer = std::sqrt(entropy1 * entropy2);
+          double arithmetic_normalizer = 0.5 * (entropy1 + entropy2);
+
+          if (opt.verbose) {
+            std::cout << "\nUnnormalized mutual information I(X,Y) = "
+                      << mutual_info << std::endl;
+            std::cout << "Geometric normalized mutual information "
+                      << "I(X,Y) / sqrt(H(X)H(Y)) = "
+                      << mutual_info / geometric_normalizer << std::endl;
+            std::cout << "Arithmetic normalized mutual information "
+                      << "I(X,Y) / 0.5(H(X) + H(Y)) = "
+                      << mutual_info / arithmetic_normalizer << std::endl;
+          }
+
+          // Calculate adjusted mutual information
+          double arithmetic_adjusted_mutual_info =
+              (mutual_info - expected_mutual_info) /
+              (arithmetic_normalizer - expected_mutual_info);
+          double geometric_adjusted_mutual_info =
+              (mutual_info - expected_mutual_info) /
+              (geometric_normalizer - expected_mutual_info);
+          std::cout
+              << "\n(Arithmetic-normalized) Adjusted Mutual Information (AMI): "
+              //   << "{I(X,Y) - E[I(X,Y)]} / {0.5(H(X) + H(Y)) - E[I(X,Y)]} = "
+              << arithmetic_adjusted_mutual_info << std::endl;
+          if (opt.verbose) {
+            std::cout
+                << "Geometric-normalized adjusted mutual information: "
+                //   << "{I(X,Y) - E[I(X,Y)]} / {sqrt(H(X)H(Y)) - E[I(X,Y)]} = "
+                << geometric_adjusted_mutual_info << std::endl;
+          }
+
+          // Calculate clustering metrics that only need sums of squares
+          clustering_metrics_no_mi_type clustering_metrics_no_mi;
+          clustering_metrics_no_mi = calculate_clustering_metrics_no_mi(
+              num_points, sum_squares_overlap, sum_squares_cluster1,
+              sum_squares_cluster2);
+
+          std::cout << "\nAdjusted Rand Index (ARI): "
+                    << clustering_metrics_no_mi.adjusted_rand_index
+                    << std::endl;
+          std::cout << "Fowlkes Mallows Index: "
+                    << clustering_metrics_no_mi.fowlkes_mallows << std::endl;
+          if (opt.calculate_purity) {
+            std::cout << "(Assumes clustering 1 is the ground truth) Purity: "
+                      << purity << std::endl;
+          }
+          std::cout << "\nPair-confusion Balanced Accuracy: "
+                    << clustering_metrics_no_mi.balanced_accuracy << std::endl;
+          std::cout << "Pair-confusion Geometric Mean: "
+                    << clustering_metrics_no_mi.geometric_mean << std::endl;
+
+          if (opt.verbose) {
+            // Calculate Rand Index (without adjustment)
+            double numerator = static_cast<double>(
+                num_points * (num_points - 1) + 2 * sum_squares_overlap -
+                sum_squares_cluster1 - sum_squares_cluster2);
+            double denominator =
+                static_cast<double>(num_points * (num_points - 1));
+
+            double rand_index = numerator / denominator;
+
+            std::cout << "\nUnadjusted Rand Index: " << rand_index << std::endl;
+          }
+        }
+
+        world.cout0("\nTime to calculate clustering metrics: ",
+                    step_timer.elapsed(), " seconds");
+        world.cout0("Total time to calculate metrics for this clustering: ",
+                    per_clustering_timer.elapsed(), " seconds");
       }
-
-      world.cout0("\nTime to calculate clustering metrics: ",
-                  step_timer.elapsed(), " seconds");
-      world.cout0("Total time to calculate metrics for this clustering: ",
-                  per_clustering_timer.elapsed(), " seconds");
-
     } // For each clustering_file2
   }
 
-  return 0;
+  return EXIT_SUCCESS;
 }

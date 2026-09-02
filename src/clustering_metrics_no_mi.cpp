@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
         parse_clustering_metrics_options(argc, argv, opt, world);
     if (unsuccessful_parse) {
       show_help();
-      return 1;
+      return EXIT_FAILURE;
     }
 
     /*
@@ -112,6 +112,11 @@ int main(int argc, char **argv) {
     }
     world.cout0("Number of clusters in clustering 1: ",
                 cluster_size_map1.size());
+
+    if (cluster_size_map1.size() == 0) {
+      world.cout0("No valid points read in partition 1. Exiting.");
+      return EXIT_FAILURE;
+    }
 
     step_timer.reset();
 
@@ -176,110 +181,117 @@ int main(int argc, char **argv) {
       world.barrier();
       step_timer.reset();
 
-      /*
-      Create a YGM map of cluster pair (i,j) -> overlap size
-      where i is a cluster_id in the first clustering, j is a cluster_id
-      in the second clustering, and overlap size is the size of the intersection
-      between clusters i and j
-      */
-      ygm::container::map<std::pair<cluster_id_type, cluster_id_type>, uint64_t>
-          cluster_overlap_map(world);
+      if (num_points == 0) {
+        world.cout0("Clusterings 1 and 2 do not share any valid points. "
+                    "Skipping this cluster comparison.");
+      } else {
+        /*
+        Create a YGM map of cluster pair (i,j) -> overlap size
+        where i is a cluster_id in the first clustering, j is a cluster_id
+        in the second clustering, and overlap size is the size of the
+        intersection between clusters i and j
+        */
+        ygm::container::map<std::pair<cluster_id_type, cluster_id_type>,
+                            uint64_t>
+            cluster_overlap_map(world);
 
-      fill_cluster_overlap_and_size_maps(point_to_clusters_map,
-                                         cluster_overlap_map, cluster_size_map1,
-                                         cluster_size_map2);
+        fill_cluster_overlap_and_size_maps(
+            point_to_clusters_map, cluster_overlap_map, cluster_size_map1,
+            cluster_size_map2);
 
-      world.cout0("\nNumber of overlapping cluster pairs: ",
-                  cluster_overlap_map.size());
-      world.cout0("Number of clusters in clustering 1: ",
-                  cluster_size_map1.size());
-      world.cout0("Number of clusters in clustering 2: ",
-                  cluster_size_map2.size());
-      if (opt.verbose) {
-        world.cout0(
-            "Time to create YGM maps of cluster overlaps and cluster sizes: ",
-            step_timer.elapsed(), " seconds");
-      }
-      step_timer.reset();
-
-      /* Calculate the sums of squares of cluster sizes */
-
-      uint64_t sum_squares_cluster1, sum_squares_cluster2, sum_squares_overlap;
-      sum_squares_cluster1 =
-          calculate_sums_of_squares_for_map_values(cluster_size_map1);
-      sum_squares_cluster2 =
-          calculate_sums_of_squares_for_map_values(cluster_size_map2);
-      sum_squares_overlap =
-          calculate_sums_of_squares_for_map_values(cluster_overlap_map);
-
-      if (opt.verbose) {
-        world.cout0("\nSum of cluster sizes squared for clustering 1: ",
-                    sum_squares_cluster1);
-        world.cout0("Sum of cluster sizes squared for clustering 2: ",
-                    sum_squares_cluster2);
-        world.cout0("Sum of overlaps squared for the two clusterings: ",
-                    sum_squares_overlap);
-        world.cout0("Time to calculate sums of squares: ", step_timer.elapsed(),
-                    " seconds");
-      }
-
-      step_timer.reset();
-      world.barrier();
-
-      // Clear cluster size maps before calculating purity
-      cluster_size_map1.clear();
-      cluster_size_map2.clear();
-      world.barrier();
-
-      /* Calculate purity */
-      double purity = 0.0;
-      if (opt.calculate_purity) {
-        purity = calculate_purity(cluster_overlap_map, num_points);
-      }
-
-      /* Calculate various clustering metrics */
-      if (world.rank() == 0) {
-        clustering_metrics_no_mi_type clustering_metrics_no_mi;
-        clustering_metrics_no_mi = calculate_clustering_metrics_no_mi(
-            num_points, sum_squares_overlap, sum_squares_cluster1,
-            sum_squares_cluster2);
-
-        std::cout << "\nAdjusted Rand Index (ARI): "
-                  << clustering_metrics_no_mi.adjusted_rand_index << std::endl;
-        std::cout << "Fowlkes Mallows Index: "
-                  << clustering_metrics_no_mi.fowlkes_mallows << std::endl;
-        if (opt.calculate_purity) {
-          std::cout << "(Assumes clustering 1 is the ground truth) Purity: "
-                    << purity << std::endl;
+        world.cout0("\nNumber of overlapping cluster pairs: ",
+                    cluster_overlap_map.size());
+        world.cout0("Number of clusters in clustering 1: ",
+                    cluster_size_map1.size());
+        world.cout0("Number of clusters in clustering 2: ",
+                    cluster_size_map2.size());
+        if (opt.verbose) {
+          world.cout0(
+              "Time to create YGM maps of cluster overlaps and cluster sizes: ",
+              step_timer.elapsed(), " seconds");
         }
-        std::cout << "\nPair-confusion balanced accuracy: "
-                  << clustering_metrics_no_mi.balanced_accuracy << std::endl;
-        std::cout << "Pair-confusion geometric mean: "
-                  << clustering_metrics_no_mi.geometric_mean << std::endl;
+        step_timer.reset();
+
+        /* Calculate the sums of squares of cluster sizes */
+
+        uint64_t sum_squares_cluster1, sum_squares_cluster2,
+            sum_squares_overlap;
+        sum_squares_cluster1 =
+            calculate_sums_of_squares_for_map_values(cluster_size_map1);
+        sum_squares_cluster2 =
+            calculate_sums_of_squares_for_map_values(cluster_size_map2);
+        sum_squares_overlap =
+            calculate_sums_of_squares_for_map_values(cluster_overlap_map);
 
         if (opt.verbose) {
-          // Calculate Rand Index (not adjusted)
-          double numerator = static_cast<double>(
-              num_points * (num_points - 1) + 2 * sum_squares_overlap -
-              sum_squares_cluster1 - sum_squares_cluster2);
-          double denominator =
-              static_cast<double>(num_points * (num_points - 1));
-
-          double rand_index = numerator / denominator;
-
-          std::cout << "\nUnadjusted Rand Index: " << rand_index << std::endl;
+          world.cout0("\nSum of cluster sizes squared for clustering 1: ",
+                      sum_squares_cluster1);
+          world.cout0("Sum of cluster sizes squared for clustering 2: ",
+                      sum_squares_cluster2);
+          world.cout0("Sum of overlaps squared for the two clusterings: ",
+                      sum_squares_overlap);
+          world.cout0("Time to calculate sums of squares: ",
+                      step_timer.elapsed(), " seconds");
         }
-      }
 
-      if (opt.verbose) {
-        world.cout0("\nTime to calculate clustering metrics: ",
-                    step_timer.elapsed(), " seconds");
-      }
-      world.cout0("Total time to calculate metrics for this clustering: ",
-                  per_clustering_timer.elapsed(), " seconds");
+        step_timer.reset();
+        world.barrier();
 
+        // Clear cluster size maps before calculating purity
+        cluster_size_map1.clear();
+        cluster_size_map2.clear();
+        world.barrier();
+
+        /* Calculate purity */
+        double purity = 0.0;
+        if (opt.calculate_purity) {
+          purity = calculate_purity(cluster_overlap_map, num_points);
+        }
+
+        /* Calculate various clustering metrics */
+        if (world.rank() == 0) {
+          clustering_metrics_no_mi_type clustering_metrics_no_mi;
+          clustering_metrics_no_mi = calculate_clustering_metrics_no_mi(
+              num_points, sum_squares_overlap, sum_squares_cluster1,
+              sum_squares_cluster2);
+
+          std::cout << "\nAdjusted Rand Index (ARI): "
+                    << clustering_metrics_no_mi.adjusted_rand_index
+                    << std::endl;
+          std::cout << "Fowlkes Mallows Index: "
+                    << clustering_metrics_no_mi.fowlkes_mallows << std::endl;
+          if (opt.calculate_purity) {
+            std::cout << "(Assumes clustering 1 is the ground truth) Purity: "
+                      << purity << std::endl;
+          }
+          std::cout << "\nPair-confusion balanced accuracy: "
+                    << clustering_metrics_no_mi.balanced_accuracy << std::endl;
+          std::cout << "Pair-confusion geometric mean: "
+                    << clustering_metrics_no_mi.geometric_mean << std::endl;
+
+          if (opt.verbose) {
+            // Calculate Rand Index (not adjusted)
+            double numerator = static_cast<double>(
+                num_points * (num_points - 1) + 2 * sum_squares_overlap -
+                sum_squares_cluster1 - sum_squares_cluster2);
+            double denominator =
+                static_cast<double>(num_points * (num_points - 1));
+
+            double rand_index = numerator / denominator;
+
+            std::cout << "\nUnadjusted Rand Index: " << rand_index << std::endl;
+          }
+        }
+
+        if (opt.verbose) {
+          world.cout0("\nTime to calculate clustering metrics: ",
+                      step_timer.elapsed(), " seconds");
+        }
+        world.cout0("Total time to calculate metrics for this clustering: ",
+                    per_clustering_timer.elapsed(), " seconds");
+      }
     } // For each clustering_file2
   }
 
-  return 0;
+  return EXIT_SUCCESS;
 }
