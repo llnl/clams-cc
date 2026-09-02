@@ -1,5 +1,5 @@
 
-#include <clustering_metrics_utils.hpp>
+#include <clustering_metrics_common.hpp>
 #include <ygm/io/multi_output.hpp>
 
 using point_id_type   = uint64_t;

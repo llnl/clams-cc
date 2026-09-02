@@ -6,7 +6,7 @@
 #include <ygm/io/line_parser.hpp>
 #include <ygm/utility/timer.hpp>
 
-#include <common_utils.hpp>
+#include "common_utils.hpp"
 
 using point_id_type   = uint64_t;
 using cluster_id_type = int32_t;
@@ -191,9 +191,10 @@ uint64_t read_first_clustering_file(
           } catch (...) {
             std::cout << "Error reading line: " << line << std::endl;
           }
-        } else {
-          std::cout << "Read comment line: " << line << std::endl;
         }
+        // else {
+        //   std::cout << "Read comment line: " << line << std::endl;
+        // }
       };
   line_parser_clustering1.for_all(read_input_line_lambda1);
 
@@ -291,9 +292,10 @@ std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> read_second_clustering_file(
           } catch (...) {
             std::cout << "Error reading line: " << line << std::endl;
           }
-        } else {
-          std::cout << "Read comment line: " << line << std::endl;
         }
+        // else {
+        //   std::cout << "Read comment line: " << line << std::endl;
+        // }
       };
 
   line_parser_clustering2.for_all(read_input_line_lambda2);

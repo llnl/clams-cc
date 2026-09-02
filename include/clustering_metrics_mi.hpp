@@ -1,6 +1,6 @@
 #pragma once
 
-#include "clustering_metrics_utils.hpp"
+#include "clustering_metrics_common.hpp"
 
 /**
  * Process point_to_clusters_map to fill cluster_overlap_map for calculating
