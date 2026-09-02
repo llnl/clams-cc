@@ -22,7 +22,8 @@ https://www.boost.org/doc/libs/1_51_0/doc/html/hash/combine.html
 
 namespace std {
 
-template <typename T1, typename T2> struct hash<pair<T1, T2>> {
+template <typename T1, typename T2>
+struct hash<pair<T1, T2>> {
   size_t operator()(const pair<T1, T2> &input_pair) const {
     size_t seed = 0;
     boost::hash_combine(seed, input_pair.first);
@@ -32,7 +33,7 @@ template <typename T1, typename T2> struct hash<pair<T1, T2>> {
     // std::hash<T2>()(input_pair.second);
   }
 };
-} // namespace std
+}  // namespace std
 
 /**
  * @brief Search file paths recursively.
@@ -43,16 +44,15 @@ template <typename T1, typename T2> struct hash<pair<T1, T2>> {
  * @param path Directory or file path.
  * @return Returns a vector of found file paths.
  */
-inline std::vector<std::filesystem::path>
-find_file_paths(const std::filesystem::path path) {
+inline std::vector<std::filesystem::path> find_file_paths(
+    const std::filesystem::path path) {
   std::vector<std::filesystem::path> paths;
   if (std::filesystem::is_regular_file(std::filesystem::path(path))) {
     paths.emplace_back(path);
   } else {
     for (const auto &entry :
          std::filesystem::recursive_directory_iterator(path)) {
-      if (entry.is_regular_file())
-        paths.emplace_back(entry.path());
+      if (entry.is_regular_file()) paths.emplace_back(entry.path());
     }
   }
   return paths;

@@ -8,7 +8,7 @@
 
 #include "common_utils.hpp"
 
-using point_id_type = uint64_t;
+using point_id_type   = uint64_t;
 using cluster_id_type = int32_t;
 
 /**
@@ -18,8 +18,8 @@ using cluster_id_type = int32_t;
 // If cluster ids are signed, we say that negative cluster ids (usually -1)
 // are noise points
 template <typename T>
-typename std::enable_if<std::is_signed<T>::value, bool>::type
-is_cluster_noise(const T &cluster_id) {
+typename std::enable_if<std::is_signed<T>::value, bool>::type is_cluster_noise(
+    const T &cluster_id) {
   return (cluster_id < 0) ? true : false;
 }
 // If the cluster ids are unsigned, we say that the max possible value of
@@ -36,10 +36,10 @@ is_cluster_noise(const T &cluster_id) {
  * Holds user options for running clustering metrics programs.
  */
 struct clustering_metrics_option_t {
-  std::filesystem::path clustering1_path;
+  std::filesystem::path              clustering1_path;
   std::vector<std::filesystem::path> vector_of_clustering2_paths;
-  bool calculate_purity = false;
-  bool verbose = false;
+  bool                               calculate_purity = false;
+  bool                               verbose          = false;
 };
 
 /**
@@ -48,32 +48,32 @@ struct clustering_metrics_option_t {
  */
 bool parse_clustering_metrics_options(int argc, char *argv[],
                                       clustering_metrics_option_t &opt,
-                                      ygm::comm &world) {
+                                      ygm::comm                   &world) {
   std::filesystem::path list_of_clustering2_files;
 
   // Read the optional arguments if available
   int opt_char;
   while ((opt_char = getopt(argc, argv, "pvhg:s:l:")) != -1) {
     switch (opt_char) {
-    case 'g':
-      opt.clustering1_path = optarg;
-      break;
-    case 'l':
-      list_of_clustering2_files = optarg;
-      break;
-    case 'p':
-      opt.calculate_purity = true;
-      break;
-    case 'v':
-      opt.verbose = true;
-      break;
-    case 'h':
-      return 1;
-    default:
-      if (world.rank() == 0) {
-        std::cerr << "Unrecognized option: " << opt_char << ", ignore."
-                  << std::endl;
-      }
+      case 'g':
+        opt.clustering1_path = optarg;
+        break;
+      case 'l':
+        list_of_clustering2_files = optarg;
+        break;
+      case 'p':
+        opt.calculate_purity = true;
+        break;
+      case 'v':
+        opt.verbose = true;
+        break;
+      case 'h':
+        return 1;
+      default:
+        if (world.rank() == 0) {
+          std::cerr << "Unrecognized option: " << opt_char << ", ignore."
+                    << std::endl;
+        }
     }
   }
 
@@ -108,7 +108,7 @@ bool parse_clustering_metrics_options(int argc, char *argv[],
     world.cout0("Reading comparison files from list in: ",
                 list_of_clustering2_files);
     std::ifstream clustering_ifs(list_of_clustering2_files);
-    std::string line;
+    std::string   line;
     while (std::getline(clustering_ifs, line)) {
       opt.vector_of_clustering2_paths.push_back(line);
     }
@@ -143,7 +143,7 @@ uint64_t read_first_clustering_file(
     std::filesystem::path &clustering1_path,
     ygm::container::map<point_id_type,
                         std::pair<cluster_id_type, cluster_id_type>>
-        &point_to_clusters_map,
+                                                   &point_to_clusters_map,
     ygm::container::map<cluster_id_type, uint64_t> &cluster_size_map1) {
   ygm::comm &mpi_comm = point_to_clusters_map.comm();
 
@@ -172,10 +172,10 @@ uint64_t read_first_clustering_file(
        &increment_cluster_size_lambda](const std::string &line) {
         if (std::isdigit(line[0])) {
           try {
-            point_id_type point_id;
-            cluster_id_type cluster_id;
+            point_id_type                               point_id;
+            cluster_id_type                             cluster_id;
             std::pair<cluster_id_type, cluster_id_type> cluster_pair(0, 0);
-            std::stringstream ss(line);
+            std::stringstream                           ss(line);
 
             ss >> point_id >> cluster_id;
 
@@ -232,14 +232,14 @@ std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> read_second_clustering_file(
   // that are also in clustering 1
   static uint64_t local_num_points;
   static uint64_t local_num_noise_points;
-  local_num_points = 0;
+  local_num_points       = 0;
   local_num_noise_points = 0;
 
   // Total number of points and number of noise points read from file
   // (need not be in clustering 1)
   static uint64_t local_num_points_in_file;
   static uint64_t local_num_noise_points_in_file;
-  local_num_points_in_file = 0;
+  local_num_points_in_file       = 0;
   local_num_noise_points_in_file = 0;
 
   std::vector<std::string> file_vector{};
@@ -252,8 +252,8 @@ std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> read_second_clustering_file(
       [&point_to_clusters_map](const std::string &line) {
         if (std::isdigit(line[0])) {
           try {
-            point_id_type point_id;
-            cluster_id_type cluster_id;
+            point_id_type     point_id;
+            cluster_id_type   cluster_id;
             std::stringstream ss(line);
             ss >> point_id >> cluster_id;
 
@@ -269,7 +269,7 @@ std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> read_second_clustering_file(
               ++local_num_noise_points_in_file;
 
               auto add_second_cluster_thats_noise_lambda =
-                  []([[maybe_unused]] const point_id_type &point_id,
+                  []([[maybe_unused]] const point_id_type        &point_id,
                      std::pair<cluster_id_type, cluster_id_type> &cluster_pair,
                      const cluster_id_type &new_cluster_id) {
                     cluster_pair.second = new_cluster_id;
@@ -280,7 +280,7 @@ std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> read_second_clustering_file(
 
             } else {
               auto add_second_cluster_lambda =
-                  []([[maybe_unused]] const point_id_type &point_id,
+                  []([[maybe_unused]] const point_id_type        &point_id,
                      std::pair<cluster_id_type, cluster_id_type> &cluster_pair,
                      const cluster_id_type &new_cluster_id) {
                     cluster_pair.second = new_cluster_id;
@@ -339,7 +339,7 @@ void fill_cluster_overlap_and_size_maps(
                         std::pair<cluster_id_type, cluster_id_type>>
         &point_to_clusters_map,
     ygm::container::map<std::pair<cluster_id_type, cluster_id_type>, uint64_t>
-        &cluster_overlap_map,
+                                                   &cluster_overlap_map,
     ygm::container::map<cluster_id_type, uint64_t> &cluster_size_map1,
     ygm::container::map<cluster_id_type, uint64_t> &cluster_size_map2) {
   ygm::comm &mpi_comm = point_to_clusters_map.comm();
@@ -351,7 +351,7 @@ void fill_cluster_overlap_and_size_maps(
 
   auto process_point_lambda =
       [&cluster_overlap_map, &cluster_size_map1, &cluster_size_map2](
-          [[maybe_unused]] const point_id_type &point_id,
+          [[maybe_unused]] const point_id_type              &point_id,
           const std::pair<cluster_id_type, cluster_id_type> &cluster_pair) {
         // Lambda to update the size of the overlap
         // Takes cluster1 and cluster2 and updates cluster1 -> (cluster,
@@ -393,12 +393,12 @@ uint64_t calculate_sums_of_squares_for_map_values(
     ygm::container::map<map_key_type, uint64_t> &ygm_map) {
   ygm::comm &mpi_comm = ygm_map.comm();
 
-  uint64_t local_sum_squares = 0;
-  auto sum_squares_lambda =
-      [&local_sum_squares]([[maybe_unused]] const map_key_type &key,
-                           const uint64_t &value) {
-        local_sum_squares = local_sum_squares + value * value;
-      };
+  uint64_t local_sum_squares  = 0;
+  auto     sum_squares_lambda = [&local_sum_squares](
+                                [[maybe_unused]] const map_key_type &key,
+                                const uint64_t                      &value) {
+    local_sum_squares = local_sum_squares + value * value;
+  };
 
   ygm_map.for_all(sum_squares_lambda);
   mpi_comm.barrier();
@@ -473,8 +473,8 @@ clustering_metrics_no_mi_type calculate_clustering_metrics_no_mi(
   // clustering 1
 
   // Sensitivity = TP / P = TP / (TP + FN)
-  numerator = static_cast<double>(sum_squares_overlap - num_points);
-  denominator = static_cast<double>(sum_squares_cluster1 - num_points);
+  numerator          = static_cast<double>(sum_squares_overlap - num_points);
+  denominator        = static_cast<double>(sum_squares_cluster1 - num_points);
   double sensitivity = numerator / denominator;
 
   // Specificity = TN / N = TN / (TN + FP)
@@ -519,17 +519,17 @@ void fill_max_ground_truth_overlap_map(
   auto ground_truth_overlap_lambda =
       [&max_ground_truth_overlap_map_ptr](
           const std::pair<cluster_id_type, cluster_id_type> &cluster_pair,
-          const uint64_t &overlap_size) {
+          const uint64_t                                    &overlap_size) {
         cluster_id_type ground_truth_id = cluster_pair.first;
-        cluster_id_type cluster_id = cluster_pair.second;
+        cluster_id_type cluster_id      = cluster_pair.second;
 
         auto visit_max_overlap_lambda =
             []([[maybe_unused]] const cluster_id_type cluster_id,
-               std::pair<cluster_id_type, uint64_t> &max_ground_truth_overlap,
-               const cluster_id_type &ground_truth_id,
-               const uint64_t &overlap_size) {
+               std::pair<cluster_id_type, uint64_t>  &max_ground_truth_overlap,
+               const cluster_id_type                 &ground_truth_id,
+               const uint64_t                        &overlap_size) {
               if (overlap_size > max_ground_truth_overlap.second) {
-                max_ground_truth_overlap.first = ground_truth_id;
+                max_ground_truth_overlap.first  = ground_truth_id;
                 max_ground_truth_overlap.second = overlap_size;
               }
             };
@@ -572,18 +572,18 @@ void fill_max_ground_truth_overlap_map(
   auto ground_truth_overlap_lambda =
       [&max_ground_truth_overlap_map_ptr](
           const std::pair<cluster_id_type, cluster_id_type> &cluster_pair,
-          const std::tuple<uint64_t, uint64_t, uint64_t> &overlap_tuple) {
+          const std::tuple<uint64_t, uint64_t, uint64_t>    &overlap_tuple) {
         cluster_id_type ground_truth_id = cluster_pair.first;
-        cluster_id_type cluster_id = cluster_pair.second;
-        uint64_t overlap_size = std::get<0>(overlap_tuple);
+        cluster_id_type cluster_id      = cluster_pair.second;
+        uint64_t        overlap_size    = std::get<0>(overlap_tuple);
 
         auto visit_max_overlap_lambda =
             []([[maybe_unused]] const cluster_id_type cluster_id,
-               std::pair<cluster_id_type, uint64_t> &max_ground_truth_overlap,
-               const cluster_id_type ground_truth_id,
-               const uint64_t &overlap_size) {
+               std::pair<cluster_id_type, uint64_t>  &max_ground_truth_overlap,
+               const cluster_id_type                  ground_truth_id,
+               const uint64_t                        &overlap_size) {
               if (overlap_size > max_ground_truth_overlap.second) {
-                max_ground_truth_overlap.first = ground_truth_id;
+                max_ground_truth_overlap.first  = ground_truth_id;
                 max_ground_truth_overlap.second = overlap_size;
               }
             };
@@ -616,7 +616,7 @@ template <typename overlap_info_type>
 double calculate_purity(
     ygm::container::map<std::pair<cluster_id_type, cluster_id_type>,
                         overlap_info_type> &cluster_overlap_map,
-    uint64_t num_points) {
+    uint64_t                                num_points) {
   ygm::comm &mpi_comm = cluster_overlap_map.comm();
 
   // Map of cluster id -> (ground truth cluster with largest overlap,
@@ -629,7 +629,7 @@ double calculate_purity(
 
   /* Calculate purity */
   uint64_t local_purity_sum = 0;
-  auto purity_sum_lambda =
+  auto     purity_sum_lambda =
       [&local_purity_sum]([[maybe_unused]] const cluster_id_type &cluster_id,
                           const std::pair<cluster_id_type, uint64_t>
                               &max_ground_truth_overlap) {
@@ -638,7 +638,7 @@ double calculate_purity(
   max_ground_truth_overlap_map.for_all(purity_sum_lambda);
   mpi_comm.barrier();
   uint64_t purity_sum = ygm::sum(local_purity_sum, mpi_comm);
-  double purity =
+  double   purity =
       static_cast<double>(purity_sum) / static_cast<double>(num_points);
 
   return purity;

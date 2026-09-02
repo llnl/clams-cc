@@ -1,7 +1,7 @@
 #include <clustering_metrics_common.hpp>
 #include <clustering_metrics_mi.hpp>
 
-using point_id_type = uint64_t;
+using point_id_type   = uint64_t;
 using cluster_id_type = int32_t;
 
 /* Show usage */
@@ -52,12 +52,14 @@ int main(int argc, char **argv) {
     */
 
     if (std::is_signed<cluster_id_type>::value) {
-      world.cout0("Using signed cluster id type. Points are considered noise "
-                  "if cluster_id < 0");
+      world.cout0(
+          "Using signed cluster id type. Points are considered noise "
+          "if cluster_id < 0");
       world.cout0("is_cluster_noise(-1) = ", is_cluster_noise(-1), "\n");
     } else {
-      world.cout0("Using unsigned cluster id type. Points are considered noise "
-                  "if cluster_id == max value for type");
+      world.cout0(
+          "Using unsigned cluster id type. Points are considered noise "
+          "if cluster_id == max value for type");
       world.cout0(
           "is_cluster_noise(", std::numeric_limits<cluster_id_type>::max(),
           ") = ", is_cluster_noise(std::numeric_limits<cluster_id_type>::max()),
@@ -71,7 +73,7 @@ int main(int argc, char **argv) {
 
     /* Parse the user inputs into files we will read */
     clustering_metrics_option_t opt;
-    bool unsuccessful_parse =
+    bool                        unsuccessful_parse =
         parse_clustering_metrics_options(argc, argv, opt, world);
     if (unsuccessful_parse) {
       show_help();
@@ -198,10 +200,10 @@ int main(int argc, char **argv) {
       step_timer.reset();
 
       if (num_points == 0) {
-        world.cout0("Clusterings 1 and 2 do not share any valid points. "
-                    "Skipping this cluster comparison.");
+        world.cout0(
+            "Clusterings 1 and 2 do not share any valid points. "
+            "Skipping this cluster comparison.");
       } else {
-
         /* Create a YGM map of hash(i,j) -> tuple(overlap size, size of cluster
         i, size of cluster j), where i is a cluster_id in the first clustering,
         j is a cluster_id in the second clustering, and overlap size is the size
@@ -329,9 +331,10 @@ int main(int argc, char **argv) {
         get_size_pairs_and_counts_for_size_pair_map(
             size_pair_map, cluster_size_count_map1, cluster_size_count_map2);
 
-        world.cout0("Number of distinct cluster size "
-                    "pairs: ",
-                    size_pair_map.size());
+        world.cout0(
+            "Number of distinct cluster size "
+            "pairs: ",
+            size_pair_map.size());
         if (opt.verbose) {
           world.cout0("Time to get the distinct cluster size pairs: ",
                       step_timer.elapsed(), " seconds");
@@ -361,8 +364,8 @@ int main(int argc, char **argv) {
         /* Calculate various clustering metrics */
         if (world.rank() == 0) {
           // Calculate normalized mutual information
-          double mutual_info = entropy1 + entropy2 - joint_entropy;
-          double geometric_normalizer = std::sqrt(entropy1 * entropy2);
+          double mutual_info           = entropy1 + entropy2 - joint_entropy;
+          double geometric_normalizer  = std::sqrt(entropy1 * entropy2);
           double arithmetic_normalizer = 0.5 * (entropy1 + entropy2);
 
           if (opt.verbose) {
@@ -433,7 +436,7 @@ int main(int argc, char **argv) {
         world.cout0("Total time to calculate metrics for this clustering: ",
                     per_clustering_timer.elapsed(), " seconds");
       }
-    } // For each clustering_file2
+    }  // For each clustering_file2
   }
 
   return EXIT_SUCCESS;

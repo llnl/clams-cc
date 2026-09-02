@@ -26,11 +26,11 @@ void fill_cluster_overlap_and_size_maps_mi(
         &point_to_clusters_map,
     ygm::container::map<std::pair<cluster_id_type, cluster_id_type>,
                         std::tuple<uint64_t, uint64_t, uint64_t>>
-        &cluster_overlap_map,
+                                                   &cluster_overlap_map,
     ygm::container::map<cluster_id_type, uint64_t> &cluster_size_map1,
     ygm::container::map<cluster_id_type, uint64_t> &cluster_size_map2) {
-  ygm::comm &mpi_comm = point_to_clusters_map.comm();
-  auto cluster_overlap_map_ptr = cluster_overlap_map.get_ygm_ptr();
+  ygm::comm &mpi_comm                = point_to_clusters_map.comm();
+  auto       cluster_overlap_map_ptr = cluster_overlap_map.get_ygm_ptr();
 
   // Make sure maps are empty to start
   cluster_overlap_map.clear();
@@ -41,7 +41,7 @@ void fill_cluster_overlap_and_size_maps_mi(
      Only count points that are not labeled as noise in clustering 2 */
   auto process_point_lambda =
       [&cluster_overlap_map, &cluster_size_map1, &cluster_size_map2](
-          [[maybe_unused]] const point_id_type &point_id,
+          [[maybe_unused]] const point_id_type              &point_id,
           const std::pair<cluster_id_type, cluster_id_type> &cluster_pair) {
         // Lambda to update the size of the overlap
         // Takes cluster1 and cluster2 and updates cluster1 -> (cluster,
@@ -78,17 +78,17 @@ void fill_cluster_overlap_and_size_maps_mi(
   auto get_cluster_size_lambda =
       [&cluster_size_map1, &cluster_size_map2, &cluster_overlap_map_ptr](
           const std::pair<cluster_id_type, cluster_id_type> &cluster_pair,
-          std::tuple<uint64_t, uint64_t, uint64_t> &overlap_tuple) {
+          std::tuple<uint64_t, uint64_t, uint64_t>          &overlap_tuple) {
         auto get_size1_lambda =
-            []([[maybe_unused]] const cluster_id_type &cluster1,
-               const uint64_t &cluster_size,
+            []([[maybe_unused]] const cluster_id_type            &cluster1,
+               const uint64_t                                    &cluster_size,
                const std::pair<cluster_id_type, cluster_id_type> &cluster_pair,
                auto cluster_overlap_map_ptr) {
               auto assign_size1_lambda =
                   []([[maybe_unused]] const std::pair<
-                         cluster_id_type, cluster_id_type> &cluster_pair,
+                         cluster_id_type, cluster_id_type>    &cluster_pair,
                      std::tuple<uint64_t, uint64_t, uint64_t> &overlap_tuple,
-                     const uint64_t cluster_size) {
+                     const uint64_t                            cluster_size) {
                     std::get<1>(overlap_tuple) = cluster_size;
                   };
               cluster_overlap_map_ptr->async_visit(
@@ -98,15 +98,15 @@ void fill_cluster_overlap_and_size_maps_mi(
                                       cluster_pair, cluster_overlap_map_ptr);
 
         auto get_size2_lambda =
-            []([[maybe_unused]] const cluster_id_type &cluster2,
-               const uint64_t &cluster_size,
+            []([[maybe_unused]] const cluster_id_type            &cluster2,
+               const uint64_t                                    &cluster_size,
                const std::pair<cluster_id_type, cluster_id_type> &cluster_pair,
                auto cluster_overlap_map_ptr) {
               auto assign_size2_lambda =
                   []([[maybe_unused]] const std::pair<
-                         cluster_id_type, cluster_id_type> &cluster_pair,
+                         cluster_id_type, cluster_id_type>    &cluster_pair,
                      std::tuple<uint64_t, uint64_t, uint64_t> &overlap_tuple,
-                     const uint64_t cluster_size) {
+                     const uint64_t                            cluster_size) {
                     std::get<2>(overlap_tuple) = cluster_size;
                   };
               cluster_overlap_map_ptr->async_visit(
@@ -132,11 +132,11 @@ void fill_cluster_overlap_and_size_maps_mi(
  */
 double calculate_clustering_entropy(
     ygm::container::map<cluster_id_type, uint64_t> &cluster_size_map,
-    uint64_t num_points) {
+    uint64_t                                        num_points) {
   ygm::comm &mpi_comm = cluster_size_map.comm();
 
-  double local_entropy = 0;
-  auto entropy_lambda = [&local_entropy, &num_points](
+  double local_entropy  = 0;
+  auto   entropy_lambda = [&local_entropy, &num_points](
                             [[maybe_unused]] const cluster_id_type &cluster_id,
                             const uint64_t &cluster_size) {
     double fraction =
@@ -167,18 +167,18 @@ double calculate_clustering_entropy(
 double calculate_joint_entropy(
     ygm::container::map<std::pair<cluster_id_type, cluster_id_type>,
                         std::tuple<uint64_t, uint64_t, uint64_t>>
-        &cluster_overlap_map,
+            &cluster_overlap_map,
     uint64_t num_points) {
   ygm::comm &mpi_comm = cluster_overlap_map.comm();
 
   double local_joint_entropy = 0;
-  auto joint_entropy_lambda =
+  auto   joint_entropy_lambda =
       [&local_joint_entropy, &num_points](
           [[maybe_unused]] const std::pair<cluster_id_type, cluster_id_type>
-              &cluster_pair,
+                                                         &cluster_pair,
           const std::tuple<uint64_t, uint64_t, uint64_t> &overlap_tuple) {
         uint64_t overlap_size = std::get<0>(overlap_tuple);
-        double fraction =
+        double   fraction =
             static_cast<double>(overlap_size) / static_cast<double>(num_points);
         local_joint_entropy =
             local_joint_entropy - fraction * std::log(fraction);
@@ -210,10 +210,10 @@ uint64_t calculate_sum_squares_overlap_mi(
 
   // Calculate the sums of overlap sizes squared
   uint64_t local_sum_squares_overlap = 0;
-  auto sum_squares_overlap_lambda =
+  auto     sum_squares_overlap_lambda =
       [&local_sum_squares_overlap](
           [[maybe_unused]] const std::pair<cluster_id_type, cluster_id_type>
-              &cluster_pair,
+                                                         &cluster_pair,
           const std::tuple<uint64_t, uint64_t, uint64_t> &overlap_tuple) {
         uint64_t overlap_size = std::get<0>(overlap_tuple);
         local_sum_squares_overlap =
@@ -237,7 +237,7 @@ uint64_t calculate_sum_squares_overlap_mi(
  */
 void fill_cluster_size_count_map(
     ygm::container::map<cluster_id_type, uint64_t> &cluster_size_map,
-    ygm::container::map<uint64_t, uint64_t> &cluster_size_count_map) {
+    ygm::container::map<uint64_t, uint64_t>        &cluster_size_count_map) {
   ygm::comm &mpi_comm = cluster_size_map.comm();
 
   cluster_size_count_map.clear();
@@ -245,7 +245,7 @@ void fill_cluster_size_count_map(
   auto get_size_counts_lambda =
       [&cluster_size_count_map](
           [[maybe_unused]] const cluster_id_type &cluster_id,
-          const uint64_t &cluster_size) {
+          const uint64_t                         &cluster_size) {
         cluster_size_count_map.async_visit(
             cluster_size,
             [](const uint64_t &cluster_size, uint64_t &count) { count += 1; });
@@ -274,10 +274,10 @@ void fill_cluster_size_count_map(
 void get_size_pairs_and_counts_for_size_pair_map(
     ygm::container::map<std::pair<uint64_t, uint64_t>,
                         std::pair<uint64_t, double>> &size_pair_map,
-    ygm::container::map<uint64_t, uint64_t> &cluster_size_count_map1,
-    ygm::container::map<uint64_t, uint64_t> &cluster_size_count_map2) {
-  ygm::comm &mpi_comm = size_pair_map.comm();
-  auto size_pair_map_ptr = size_pair_map.get_ygm_ptr();
+    ygm::container::map<uint64_t, uint64_t>          &cluster_size_count_map1,
+    ygm::container::map<uint64_t, uint64_t>          &cluster_size_count_map2) {
+  ygm::comm &mpi_comm          = size_pair_map.comm();
+  auto       size_pair_map_ptr = size_pair_map.get_ygm_ptr();
 
   size_pair_map.clear();
 
@@ -294,7 +294,7 @@ void get_size_pairs_and_counts_for_size_pair_map(
   auto populate_vector_for_this_rank_lambda =
       [&local_vector_for_this_rank](
           [[maybe_unused]] const uint64_t &cluster_size,
-          const uint64_t &count) {
+          const uint64_t                  &count) {
         local_vector_for_this_rank.push_back(
             std::make_pair(cluster_size, count));
       };
@@ -320,28 +320,28 @@ void get_size_pairs_and_counts_for_size_pair_map(
   mpi_comm.barrier();
 
   /* Get the count of each cluster-size pair */
-  auto get_distinct_size_pairs_lambda =
-      [&size_pair_map_ptr]([[maybe_unused]] const uint64_t &cluster_size,
-                           const uint64_t &count) {
-        for (auto local_map_pair : local_size_count_vector) {
-          std::pair<uint64_t, uint64_t> size_pair =
-              std::make_pair(std::min(cluster_size, local_map_pair.first),
-                             std::max(cluster_size, local_map_pair.first));
+  auto get_distinct_size_pairs_lambda = [&size_pair_map_ptr](
+                                            [[maybe_unused]] const uint64_t
+                                                           &cluster_size,
+                                            const uint64_t &count) {
+    for (auto local_map_pair : local_size_count_vector) {
+      std::pair<uint64_t, uint64_t> size_pair =
+          std::make_pair(std::min(cluster_size, local_map_pair.first),
+                         std::max(cluster_size, local_map_pair.first));
 
-          uint64_t increase = count * local_map_pair.second;
+      uint64_t increase = count * local_map_pair.second;
 
-          auto increment_size_pair_count_lambda =
-              [&count, &local_map_pair](
-                  [[maybe_unused]] const std::pair<uint64_t, uint64_t>
-                      &size_pair,
-                  std::pair<uint64_t, double> &pair_info, uint64_t increase) {
-                pair_info.first = pair_info.first + increase;
-              };
+      auto increment_size_pair_count_lambda =
+          [&count, &local_map_pair](
+              [[maybe_unused]] const std::pair<uint64_t, uint64_t> &size_pair,
+              std::pair<uint64_t, double> &pair_info, uint64_t increase) {
+            pair_info.first = pair_info.first + increase;
+          };
 
-          size_pair_map_ptr->async_visit(
-              size_pair, increment_size_pair_count_lambda, increase);
-        };
-      };
+      size_pair_map_ptr->async_visit(
+          size_pair, increment_size_pair_count_lambda, increase);
+    };
+  };
 
   if (clustering1_has_fewer_size_counts) {
     cluster_size_count_map2.for_all(get_distinct_size_pairs_lambda);
@@ -369,9 +369,9 @@ void get_size_pairs_and_counts_for_size_pair_map(
 void fill_size_pair_map_expected_mi_contributions(
     ygm::container::map<std::pair<uint64_t, uint64_t>,
                         std::pair<uint64_t, double>> &size_pair_map,
-    uint64_t num_points) {
-  ygm::comm &mpi_comm = size_pair_map.comm();
-  auto size_pair_map_ptr = size_pair_map.get_ygm_ptr();
+    uint64_t                                          num_points) {
+  ygm::comm &mpi_comm          = size_pair_map.comm();
+  auto       size_pair_map_ptr = size_pair_map.get_ygm_ptr();
 
   /*
     Make lookup vectors to speed up expected mutual information
@@ -387,14 +387,14 @@ void fill_size_pair_map_expected_mi_contributions(
     - The log vector has length max(ai)+1
     local_lookup_vector_log[n] = n * log(n) / N
   */
-  uint64_t local_max_ai = 0;
-  uint64_t local_max_bj = 0;
-  uint64_t local_min_bj = num_points;
+  uint64_t local_max_ai            = 0;
+  uint64_t local_max_bj            = 0;
+  uint64_t local_min_bj            = num_points;
   uint64_t local_max_sum_size_pair = 0;
 
   auto get_lookup_vector_lengths_lambda =
       [&local_max_ai, &local_max_bj, &local_min_bj, &local_max_sum_size_pair](
-          const std::pair<uint64_t, uint64_t> &size_pair,
+          const std::pair<uint64_t, uint64_t>          &size_pair,
           [[maybe_unused]] std::pair<uint64_t, double> &pair_info) {
         if (size_pair.first > local_max_ai) {
           local_max_ai = size_pair.first;
@@ -421,7 +421,7 @@ void fill_size_pair_map_expected_mi_contributions(
 
   // Populate our look-up vectors
   std::vector<double> local_lookup_vector_small_lgamma(local_max_bj + 1, 1.0);
-  uint64_t size_local_lookup_vector_large_lgamma =
+  uint64_t            size_local_lookup_vector_large_lgamma =
       std::min(local_max_sum_size_pair - local_min_bj + 1,
                num_points - local_min_bj + 1);
   std::vector<double> local_lookup_vector_large_lgamma(
@@ -452,7 +452,7 @@ void fill_size_pair_map_expected_mi_contributions(
 
   // For each cluster-size pair, calculate the contribution to the
   // innermost sum of the expected value for adjusted mutual information
-  double log_num_points = std::log(num_points);
+  double log_num_points    = std::log(num_points);
   double lgamma_num_points = std::lgamma(num_points + 1);
 
   auto calculate_expectation_contribution_lambda =
@@ -461,7 +461,7 @@ void fill_size_pair_map_expected_mi_contributions(
        &local_min_bj, &local_lookup_vector_log,
        &size_local_lookup_vector_large_lgamma](
           [[maybe_unused]] const std::pair<uint64_t, uint64_t> &size_pair,
-          std::pair<uint64_t, double> &pair_info) {
+          std::pair<uint64_t, double>                          &pair_info) {
         double expectation_contribution = 0.0;
         double shared_term1 = 1.0 / static_cast<double>(num_points) *
                               (log_num_points - std::log(size_pair.first) -
@@ -477,7 +477,7 @@ void fill_size_pair_map_expected_mi_contributions(
                      static_cast<int64_t>(size_pair.first + size_pair.second -
                                           num_points));
         uint64_t end_index =
-            size_pair.first; // since size_pair.first <= size_pair.second
+            size_pair.first;  // since size_pair.first <= size_pair.second
 
         double term1, term2;
 
@@ -525,10 +525,10 @@ double calculate_expected_mutual_information(
 
   // Calculate the expected mutual information
   double local_expected_mutual_info = 0.0;
-  auto expected_mutual_info_lambda =
+  auto   expected_mutual_info_lambda =
       [&local_expected_mutual_info](
           [[maybe_unused]] const std::pair<uint64_t, uint64_t> &size_pair,
-          const std::pair<uint64_t, double> &pair_info) {
+          const std::pair<uint64_t, double>                    &pair_info) {
         local_expected_mutual_info +=
             static_cast<double>(pair_info.first) * pair_info.second;
       };
