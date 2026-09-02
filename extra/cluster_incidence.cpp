@@ -1,8 +1,8 @@
 
-#include <clustering_metrics_utils.hpp>
+#include <clustering_metrics_common.hpp>
 #include <ygm/io/multi_output.hpp>
 
-using point_id_type   = uint64_t;
+using point_id_type = uint64_t;
 using cluster_id_type = int32_t;
 
 /* Show usage */
@@ -50,14 +50,12 @@ int main(int argc, char **argv) {
     */
 
     if (std::is_signed<cluster_id_type>::value) {
-      world.cout0(
-          "Using signed cluster id type. Points are considered noise "
-          "if cluster_id < 0");
+      world.cout0("Using signed cluster id type. Points are considered noise "
+                  "if cluster_id < 0");
       world.cout0("is_cluster_noise(-1) = ", is_cluster_noise(-1), "\n");
     } else {
-      world.cout0(
-          "Using unsigned cluster id type. Points are considered noise "
-          "if cluster_id == max value for type");
+      world.cout0("Using unsigned cluster id type. Points are considered noise "
+                  "if cluster_id == max value for type");
       world.cout0(
           "is_cluster_noise(", std::numeric_limits<cluster_id_type>::max(),
           ") = ", is_cluster_noise(std::numeric_limits<cluster_id_type>::max()),
@@ -86,29 +84,29 @@ int main(int argc, char **argv) {
     int opt_char;
     while ((opt_char = getopt(argc, argv, "vhg:c:o:")) != -1) {
       switch (opt_char) {
-        case 'g':
-          clustering1_path = optarg;
-          break;
-        case 'c':
-          clustering2_path = optarg;
-          break;
-        case 'o':
-          output_path = optarg;
-          break;
-        case 'v':
-          verbose_printout = true;
-          break;
-        case 'h':
-          if (world.rank() == 0) {
-            show_help();
-          }
-          return 1;
-        default:
-          if (world.rank() == 0) {
-            std::cerr << "Unrecognized option: " << opt_char << ", ignore."
-                      << std::endl;
-            show_help();
-          }
+      case 'g':
+        clustering1_path = optarg;
+        break;
+      case 'c':
+        clustering2_path = optarg;
+        break;
+      case 'o':
+        output_path = optarg;
+        break;
+      case 'v':
+        verbose_printout = true;
+        break;
+      case 'h':
+        if (world.rank() == 0) {
+          show_help();
+        }
+        return 1;
+      default:
+        if (world.rank() == 0) {
+          std::cerr << "Unrecognized option: " << opt_char << ", ignore."
+                    << std::endl;
+          show_help();
+        }
       }
     }
 
@@ -163,8 +161,8 @@ int main(int argc, char **argv) {
           [&cluster_to_members_map1](const std::string &line) {
             if (std::isdigit(line[0])) {
               try {
-                point_id_type     point_id;
-                cluster_id_type   cluster_id;
+                point_id_type point_id;
+                cluster_id_type cluster_id;
                 std::stringstream ss(line);
 
                 ss >> point_id >> cluster_id;
@@ -176,9 +174,9 @@ int main(int argc, char **argv) {
                   ++local_num_points_clustering1;
                   cluster_to_members_map1.async_visit(
                       cluster_id,
-                      [](const cluster_id_type      &cluster_id,
+                      [](const cluster_id_type &cluster_id,
                          std::vector<point_id_type> &members,
-                         const point_id_type        &new_member) {
+                         const point_id_type &new_member) {
                         members.push_back(new_member);
                       },
                       point_id);
@@ -238,8 +236,8 @@ int main(int argc, char **argv) {
           [&point_to_cluster_map2](const std::string &line) {
             if (std::isdigit(line[0])) {
               try {
-                point_id_type     point_id;
-                cluster_id_type   cluster_id;
+                point_id_type point_id;
+                cluster_id_type cluster_id;
                 std::stringstream ss(line);
 
                 ss >> point_id >> cluster_id;
@@ -282,7 +280,7 @@ int main(int argc, char **argv) {
     */
 
     ygm::container::map<cluster_id_type, std::set<cluster_id_type>>
-         cluster_to_represented_clusters_map(world);
+        cluster_to_represented_clusters_map(world);
     auto cluster_to_represented_clusters_map_ptr =
         cluster_to_represented_clusters_map.get_ygm_ptr();
 
@@ -295,11 +293,11 @@ int main(int argc, char **argv) {
       auto process_clusters_lambda =
           [&cluster_to_represented_clusters_map_ptr, &point_to_cluster_map2](
               [[maybe_unused]] const cluster_id_type &clustering1_cluster_id,
-              std::vector<point_id_type>             &members) {
+              std::vector<point_id_type> &members) {
             auto add_cluster_rep_lambda =
                 []([[maybe_unused]] const point_id_type &point,
-                   const cluster_id_type                &clustering2_cluster_id,
-                   const cluster_id_type                &clustering1_cluster_id,
+                   const cluster_id_type &clustering2_cluster_id,
+                   const cluster_id_type &clustering1_cluster_id,
                    auto cluster_to_represented_clusters_map_ptr) {
                   cluster_to_represented_clusters_map_ptr->async_visit(
                       clustering1_cluster_id,
@@ -352,7 +350,7 @@ int main(int argc, char **argv) {
                   incidence_map.async_visit(
                       cluster_pair,
                       [](const std::pair<cluster_id_type, cluster_id_type>
-                                  &cluster_pair,
+                             &cluster_pair,
                          uint32_t &incidence) { ++incidence; });
                 }
               }
@@ -367,7 +365,7 @@ int main(int argc, char **argv) {
 
     /* Write to file */
 
-    std::string        output_dir = output_path.parent_path().c_str();
+    std::string output_dir = output_path.parent_path().c_str();
     static std::string filename;
     filename = output_path.filename().c_str();
 
@@ -380,7 +378,7 @@ int main(int argc, char **argv) {
 
       auto write_incidence_lambda =
           [&mo](const std::pair<cluster_id_type, cluster_id_type> &cluster_pair,
-                const uint32_t                                    &incidence) {
+                const uint32_t &incidence) {
             std::stringstream ss;
             ss << cluster_pair.first << "\t" << cluster_pair.second << "\t"
                << incidence;

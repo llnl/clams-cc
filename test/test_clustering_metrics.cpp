@@ -3,8 +3,8 @@
 
 #undef NDEBUG
 
+#include <clustering_metrics_common.hpp>
 #include <clustering_metrics_mi.hpp>
-#include <clustering_metrics_utils.hpp>
 
 int main(int argc, char **argv) {
   ygm::comm world(&argc, &argv);

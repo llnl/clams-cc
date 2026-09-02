@@ -1,4 +1,4 @@
-#include <clustering_metrics_utils.hpp>
+#include <clustering_metrics_common.hpp>
 
 /* Show usage */
 void show_help() {
@@ -48,30 +48,27 @@ int main(int argc, char **argv) {
     */
 
     if (std::is_signed<cluster_id_type>::value) {
-      world.cout0(
-          "Using signed cluster id type. Points are considered noise "
-          "if cluster_id < 0");
+      world.cout0("Using signed cluster id type. Points are considered noise "
+                  "if cluster_id < 0");
       world.cout0("is_cluster_noise(-1) = ", is_cluster_noise(-1), "\n");
     } else {
-      world.cout0(
-          "Using unsigned cluster id type. Points are considered noise "
-          "if cluster_id == max value for type");
+      world.cout0("Using unsigned cluster id type. Points are considered noise "
+                  "if cluster_id == max value for type");
       world.cout0(
           "is_cluster_noise(", std::numeric_limits<cluster_id_type>::max(),
           ") = ", is_cluster_noise(std::numeric_limits<cluster_id_type>::max()),
           "\n");
     }
 
-    world.cout0(
-        "Calculating clustering metrics without information theoretic "
-        "measures");
+    world.cout0("Calculating clustering metrics without information theoretic "
+                "measures");
     world.cout0("The number of ranks is ", world.size(), "\n");
     ygm::utility::timer step_timer{};
     ygm::utility::timer per_clustering_timer{};
 
     /* Parse the user inputs into files we will read */
     clustering_metrics_option_t opt;
-    bool                        unsuccessful_parse =
+    bool unsuccessful_parse =
         parse_clustering_metrics_options(argc, argv, opt, world);
     if (unsuccessful_parse) {
       show_help();
@@ -281,7 +278,7 @@ int main(int argc, char **argv) {
       world.cout0("Total time to calculate metrics for this clustering: ",
                   per_clustering_timer.elapsed(), " seconds");
 
-    }  // For each clustering_file2
+    } // For each clustering_file2
   }
 
   return 0;
