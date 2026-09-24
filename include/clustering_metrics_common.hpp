@@ -95,7 +95,7 @@ bool parse_clustering_metrics_options(int argc, char *argv[],
   if (!std::filesystem::exists(opt.clustering1_path) ||
       std::filesystem::is_empty(opt.clustering1_path)) {
     if (world.rank() == 0) {
-      std::cout << "Error: No valid clustering 1 file provided";
+      std::cout << "Error: No valid clustering 1 file provided" << std::endl;
     }
     return 1;
   }
@@ -191,10 +191,11 @@ uint64_t read_first_clustering_file(
           } catch (...) {
             std::cout << "Error reading line: " << line << std::endl;
           }
+        } else {
+          if (!line.empty() && line[0] != '#') {
+            std::cout << "Read and ignored text line: " << line << std::endl;
+          }
         }
-        // else {
-        //   std::cout << "Read comment line: " << line << std::endl;
-        // }
       };
   line_parser_clustering1.for_all(read_input_line_lambda1);
 
@@ -292,10 +293,11 @@ std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> read_second_clustering_file(
           } catch (...) {
             std::cout << "Error reading line: " << line << std::endl;
           }
+        } else {
+          if (!line.empty() && line[0] != '#') {
+            std::cout << "Read and ignored text line: " << line << std::endl;
+          }
         }
-        // else {
-        //   std::cout << "Read comment line: " << line << std::endl;
-        // }
       };
 
   line_parser_clustering2.for_all(read_input_line_lambda2);
